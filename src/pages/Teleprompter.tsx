@@ -9,7 +9,7 @@ import {
   ArrowLeft,
   Maximize,
   Minimize,
-  TextSize,
+  Type,
   Palette,
   AlignVerticalDistributeStart
 } from "lucide-react";
@@ -221,7 +221,7 @@ const Teleprompter = () => {
                 onClick={() => setTextSize("small")}
                 className={`${textSize === "small" ? 'bg-gray-200' : ''} ${isFullscreen ? 'text-white hover:bg-gray-700' : ''} px-2`}
               >
-                <TextSize className="h-4 w-4" />
+                <Type className="h-4 w-4" />
                 <span className="ml-1">S</span>
               </Button>
               <Button
@@ -230,7 +230,7 @@ const Teleprompter = () => {
                 onClick={() => setTextSize("medium")}
                 className={`${textSize === "medium" ? 'bg-gray-200' : ''} ${isFullscreen ? 'text-white hover:bg-gray-700' : ''} px-2`}
               >
-                <TextSize className="h-4 w-4" />
+                <Type className="h-4 w-4" />
                 <span className="ml-1">M</span>
               </Button>
               <Button
@@ -239,7 +239,7 @@ const Teleprompter = () => {
                 onClick={() => setTextSize("large")}
                 className={`${textSize === "large" ? 'bg-gray-200' : ''} ${isFullscreen ? 'text-white hover:bg-gray-700' : ''} px-2`}
               >
-                <TextSize className="h-4 w-4" />
+                <Type className="h-4 w-4" />
                 <span className="ml-1">L</span>
               </Button>
             </div>
