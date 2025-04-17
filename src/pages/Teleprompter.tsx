@@ -4,6 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
   Play,
   Pause,
   ArrowLeft,
@@ -11,7 +16,8 @@ import {
   Minimize,
   Type,
   Palette,
-  AlignVerticalDistributeStart
+  AlignVerticalDistributeStart,
+  X
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
@@ -24,6 +30,7 @@ const Teleprompter = () => {
   const [textSize, setTextSize] = useState("medium"); // "small", "medium", "large"
   const [textColor, setTextColor] = useState("white"); // "white", "yellow", "lightblue"
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPresentationMode, setIsPresentationMode] = useState(false);
   
   const prompterRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -74,6 +81,29 @@ const Teleprompter = () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
   }, []);
+  
+  // Enter presentation mode
+  const enterPresentationMode = () => {
+    setIsPresentationMode(true);
+    // Wait for component to render in presentation mode before starting scroll
+    setTimeout(() => {
+      if (!isScrolling) {
+        toggleScrolling();
+      }
+    }, 100);
+  };
+  
+  // Exit presentation mode
+  const exitPresentationMode = () => {
+    setIsPresentationMode(false);
+    if (isScrolling) {
+      toggleScrolling();
+    }
+    // Reset scroll position
+    if (prompterRef.current) {
+      prompterRef.current.scrollTop = 0;
+    }
+  };
   
   // Start/stop scrolling
   const toggleScrolling = () => {
@@ -160,15 +190,127 @@ const Teleprompter = () => {
   const getTextColorClass = () => {
     switch (textColor) {
       case "yellow":
-        return "text-teleprompter-yellow";
+        return "text-yellow-400";
       case "lightblue":
-        return "text-teleprompter-lightblue";
+        return "text-blue-300";
       case "white":
       default:
         return "text-white";
     }
   };
+
+  // If in presentation mode, render presentation view
+  if (isPresentationMode) {
+    return (
+      <div className="fixed inset-0 bg-black flex flex-col" ref={containerRef}>
+        <div 
+          ref={prompterRef}
+          className="flex-1 overflow-y-auto px-8 py-16"
+        >
+          <p className={`${getTextSizeClass()} ${getTextColorClass()} leading-relaxed text-center`}>
+            {script}
+          </p>
+        </div>
+        
+        {/* Floating control panel */}
+        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 rounded-lg px-4 py-3 flex flex-wrap gap-4 items-center shadow-lg border border-gray-800 backdrop-blur-sm animate-fade-in">
+          <Button
+            onClick={toggleScrolling}
+            variant="outline"
+            size="sm"
+            className="bg-black/90 border-gray-700 text-white hover:bg-gray-800"
+          >
+            {isScrolling ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
+            {isScrolling ? "Pause" : "Play"}
+          </Button>
+          
+          <div className="flex items-center gap-2">
+            <AlignVerticalDistributeStart className="h-4 w-4 text-gray-400" />
+            <Slider
+              value={[scrollSpeed]}
+              min={1}
+              max={5}
+              step={1}
+              onValueChange={(value) => setScrollSpeed(value[0])}
+              className="w-28"
+            />
+          </div>
+          
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setTextSize("small")}
+              className={`${textSize === "small" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 px-2`}
+            >
+              <Type className="h-3 w-3" />
+              <span className="ml-1">S</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setTextSize("medium")}
+              className={`${textSize === "medium" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 px-2`}
+            >
+              <Type className="h-4 w-4" />
+              <span className="ml-1">M</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setTextSize("large")}
+              className={`${textSize === "large" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 px-2`}
+            >
+              <Type className="h-5 w-5" />
+              <span className="ml-1">L</span>
+            </Button>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Palette className="h-4 w-4 text-gray-400" />
+            <div className="flex">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setTextColor("white")}
+                className={`rounded-r-none ${textColor === "white" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 p-1`}
+              >
+                <div className="h-4 w-4 bg-white rounded-full border border-gray-600"></div>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setTextColor("yellow")}
+                className={`rounded-none ${textColor === "yellow" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 p-1`}
+              >
+                <div className="h-4 w-4 bg-yellow-400 rounded-full"></div>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setTextColor("lightblue")}
+                className={`rounded-l-none ${textColor === "lightblue" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 p-1`}
+              >
+                <div className="h-4 w-4 bg-blue-300 rounded-full"></div>
+              </Button>
+            </div>
+          </div>
+          
+          <Button
+            onClick={exitPresentationMode}
+            variant="outline"
+            size="sm"
+            className="bg-black/90 border-gray-700 text-white hover:bg-gray-800"
+          >
+            <X className="h-4 w-4 mr-2" />
+            Exit
+          </Button>
+        </div>
+      </div>
+    );
+  }
   
+  // Regular editor view
   return (
     <div className="min-h-screen bg-white flex flex-col" ref={containerRef}>
       {!isFullscreen && (
@@ -215,6 +357,18 @@ const Teleprompter = () => {
 
         {(!isFullscreen || document.fullscreenElement) && (
           <div className={`mt-4 flex flex-wrap gap-4 items-center ${isFullscreen ? 'p-4 bg-black/70 rounded-t-lg' : ''}`}>
+            {/* Presentation Mode Button */}
+            <Button
+              onClick={enterPresentationMode}
+              variant="default"
+              disabled={!script.trim()}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Play className="h-4 w-4 mr-2" />
+              Presentation Mode
+            </Button>
+            
+            {/* Original Scroll Controls */}
             <Button
               onClick={toggleScrolling}
               variant="outline"
@@ -283,7 +437,7 @@ const Teleprompter = () => {
                   onClick={() => setTextColor("yellow")}
                   className={`rounded-none ${textColor === "yellow" ? 'bg-gray-200' : ''} ${isFullscreen ? 'text-white hover:bg-gray-700' : ''} p-1`}
                 >
-                  <div className="h-4 w-4 bg-teleprompter-yellow rounded-full"></div>
+                  <div className="h-4 w-4 bg-yellow-400 rounded-full"></div>
                 </Button>
                 <Button
                   variant="ghost"
@@ -291,7 +445,7 @@ const Teleprompter = () => {
                   onClick={() => setTextColor("lightblue")}
                   className={`rounded-l-none ${textColor === "lightblue" ? 'bg-gray-200' : ''} ${isFullscreen ? 'text-white hover:bg-gray-700' : ''} p-1`}
                 >
-                  <div className="h-4 w-4 bg-teleprompter-lightblue rounded-full"></div>
+                  <div className="h-4 w-4 bg-blue-300 rounded-full"></div>
                 </Button>
               </div>
             </div>
