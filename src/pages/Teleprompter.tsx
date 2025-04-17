@@ -27,7 +27,7 @@ const Teleprompter = () => {
   
   const prompterRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollIntervalRef = useRef<number | null>(null);
   
   // Toggle fullscreen
   const toggleFullscreen = () => {
@@ -78,47 +78,69 @@ const Teleprompter = () => {
   // Start/stop scrolling
   const toggleScrolling = () => {
     if (isScrolling) {
-      if (scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
+      if (scrollIntervalRef.current !== null) {
+        cancelAnimationFrame(scrollIntervalRef.current);
         scrollIntervalRef.current = null;
       }
     } else {
-      const speedMap = {
-        1: 30, // Slow - 30ms for each pixel
-        2: 25, // Normal slow
-        3: 20, // Normal
-        4: 15, // Normal fast
-        5: 10  // Fast - 10ms for each pixel
-      };
-      
-      scrollIntervalRef.current = setInterval(() => {
-        if (prompterRef.current) {
-          prompterRef.current.scrollTop += 1;
+      // Using requestAnimationFrame for smoother scrolling
+      let lastTime = 0;
+      const scrollStep = () => {
+        const now = Date.now();
+        const speedMap = {
+          1: 40, // Slow - lower number means faster scroll
+          2: 25, // Normal slow
+          3: 15, // Normal
+          4: 10, // Normal fast
+          5: 6  // Fast - higher speed
+        };
+
+        // Only scroll if enough time has passed based on speed setting
+        if (now - lastTime > speedMap[scrollSpeed as keyof typeof speedMap]) {
+          lastTime = now;
           
-          // Auto-stop when reaching the end
-          if (
-            prompterRef.current.scrollHeight - prompterRef.current.scrollTop <=
-            prompterRef.current.clientHeight + 10
-          ) {
-            toggleScrolling();
-            // Reset scroll to top
-            prompterRef.current.scrollTop = 0;
+          if (prompterRef.current) {
+            prompterRef.current.scrollTop += 1;
+            
+            // Auto-stop when reaching the end
+            if (
+              prompterRef.current.scrollHeight - prompterRef.current.scrollTop <=
+              prompterRef.current.clientHeight + 10
+            ) {
+              setIsScrolling(false);
+              // Reset scroll to top
+              prompterRef.current.scrollTop = 0;
+              return;
+            }
           }
         }
-      }, speedMap[scrollSpeed as keyof typeof speedMap]);
+        
+        scrollIntervalRef.current = requestAnimationFrame(scrollStep);
+      };
+      
+      scrollIntervalRef.current = requestAnimationFrame(scrollStep);
     }
     
     setIsScrolling(!isScrolling);
   };
   
-  // Clean up interval on unmount
+  // Clean up animation frame on unmount
   useEffect(() => {
     return () => {
-      if (scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
+      if (scrollIntervalRef.current !== null) {
+        cancelAnimationFrame(scrollIntervalRef.current);
       }
     };
   }, []);
+
+  // Stop scrolling if speed changes while scrolling
+  useEffect(() => {
+    if (isScrolling) {
+      // Restart scrolling with new speed
+      toggleScrolling();
+      toggleScrolling();
+    }
+  }, [scrollSpeed]);
   
   // Get text size class
   const getTextSizeClass = () => {
