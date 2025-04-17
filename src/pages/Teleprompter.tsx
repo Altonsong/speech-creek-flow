@@ -118,11 +118,11 @@ const Teleprompter = () => {
       const scrollStep = () => {
         const now = Date.now();
         const speedMap = {
-          1: 40, // Slow - lower number means faster scroll
-          2: 25, // Normal slow
-          3: 15, // Normal
-          4: 10, // Normal fast
-          5: 6  // Fast - higher speed
+          1: 80, // Slow - lower number means faster scroll
+          2: 50, // Normal slow
+          3: 30, // Normal
+          4: 20, // Normal fast
+          5: 15  // Fast - higher speed
         };
 
         // Only scroll if enough time has passed based on speed setting
@@ -176,13 +176,13 @@ const Teleprompter = () => {
   const getTextSizeClass = () => {
     switch (textSize) {
       case "small":
-        return "text-lg md:text-xl";
-      case "medium":
-        return "text-xl md:text-2xl";
-      case "large":
         return "text-2xl md:text-3xl";
+      case "medium":
+        return "text-3xl md:text-4xl";
+      case "large":
+        return "text-4xl md:text-5xl";
       default:
-        return "text-xl md:text-2xl";
+        return "text-3xl md:text-4xl";
     }
   };
   
@@ -207,7 +207,8 @@ const Teleprompter = () => {
           ref={prompterRef}
           className="flex-1 overflow-y-auto px-8 py-16"
         >
-          <p className={`${getTextSizeClass()} ${getTextColorClass()} leading-relaxed text-center`}>
+          <p className={`${getTextSizeClass()} ${getTextColorClass()} leading-relaxed tracking-wider text-center`}>
+
             {script}
           </p>
         </div>
@@ -243,7 +244,7 @@ const Teleprompter = () => {
               onClick={() => setTextSize("small")}
               className={`${textSize === "small" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 px-2`}
             >
-              <Type className="h-3 w-3" />
+              <Type className="h-5 w-5" />
               <span className="ml-1">S</span>
             </Button>
             <Button
@@ -252,7 +253,7 @@ const Teleprompter = () => {
               onClick={() => setTextSize("medium")}
               className={`${textSize === "medium" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 px-2`}
             >
-              <Type className="h-4 w-4" />
+              <Type className="h-6 w-6" />
               <span className="ml-1">M</span>
             </Button>
             <Button
@@ -261,7 +262,7 @@ const Teleprompter = () => {
               onClick={() => setTextSize("large")}
               className={`${textSize === "large" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 px-2`}
             >
-              <Type className="h-5 w-5" />
+              <Type className="h-7 w-7" />
               <span className="ml-1">L</span>
             </Button>
           </div>
