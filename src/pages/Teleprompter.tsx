@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,10 +16,13 @@ import {
   Type,
   Palette,
   AlignVerticalDistributeStart,
-  X
+  X,
+  Mic,
+  MicOff
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
+import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 
 const Teleprompter = () => {
   const { toast } = useToast();
@@ -35,6 +37,12 @@ const Teleprompter = () => {
   const prompterRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollIntervalRef = useRef<number | null>(null);
+
+  const { isListening, error, startListening, stopListening } = useSpeechRecognition({
+    onSpeechRate: (rate) => {
+      setScrollSpeed(rate);
+    }
+  });
   
   // Toggle fullscreen
   const toggleFullscreen = () => {
@@ -199,6 +207,118 @@ const Teleprompter = () => {
     }
   };
 
+  const renderControlPanel = () => (
+    <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 rounded-lg px-4 py-3 flex flex-wrap gap-4 items-center shadow-lg border border-gray-800 backdrop-blur-sm animate-fade-in">
+      <Button
+        onClick={toggleScrolling}
+        variant="outline"
+        size="sm"
+        className="bg-black/90 border-gray-700 text-white hover:bg-gray-800"
+      >
+        {isScrolling ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
+        {isScrolling ? "Pause" : "Play"}
+      </Button>
+
+      <Button
+        onClick={isListening ? stopListening : startListening}
+        variant="outline"
+        size="sm"
+        className={`bg-black/90 border-gray-700 text-white hover:bg-gray-800 ${
+          isListening ? 'bg-emerald-900/50' : ''
+        }`}
+      >
+        {isListening ? (
+          <Mic className="h-4 w-4 mr-2 text-emerald-500" />
+        ) : (
+          <MicOff className="h-4 w-4 mr-2" />
+        )}
+        {isListening ? "Stop Voice" : "Start Voice"}
+      </Button>
+      
+      <div className="flex items-center gap-2">
+        <AlignVerticalDistributeStart className="h-4 w-4 text-gray-400" />
+        <Slider
+          value={[scrollSpeed]}
+          min={1}
+          max={5}
+          step={1}
+          onValueChange={(value) => setScrollSpeed(value[0])}
+          className="w-28"
+        />
+      </div>
+      
+      <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setTextSize("small")}
+          className={`${textSize === "small" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 px-2`}
+        >
+          <Type className="h-5 w-5" />
+          <span className="ml-1">S</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setTextSize("medium")}
+          className={`${textSize === "medium" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 px-2`}
+        >
+          <Type className="h-6 w-6" />
+          <span className="ml-1">M</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setTextSize("large")}
+          className={`${textSize === "large" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 px-2`}
+        >
+          <Type className="h-7 w-7" />
+          <span className="ml-1">L</span>
+        </Button>
+      </div>
+      
+      <div className="flex items-center gap-2">
+        <Palette className="h-4 w-4 text-gray-400" />
+        <div className="flex">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setTextColor("white")}
+            className={`rounded-r-none ${textColor === "white" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 p-1`}
+          >
+            <div className="h-4 w-4 bg-white rounded-full border border-gray-600"></div>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setTextColor("yellow")}
+            className={`rounded-none ${textColor === "yellow" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 p-1`}
+          >
+            <div className="h-4 w-4 bg-yellow-400 rounded-full"></div>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setTextColor("lightblue")}
+            className={`rounded-l-none ${textColor === "lightblue" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 p-1`}
+          >
+            <div className="h-4 w-4 bg-blue-300 rounded-full"></div>
+          </Button>
+        </div>
+      </div>
+      
+      <Button
+        onClick={exitPresentationMode}
+        variant="outline"
+        size="sm"
+        className="bg-black/90 border-gray-700 text-white hover:bg-gray-800"
+      >
+        <X className="h-4 w-4 mr-2" />
+        Exit
+      </Button>
+    </div>
+  );
+
   // If in presentation mode, render presentation view
   if (isPresentationMode) {
     return (
@@ -208,105 +328,10 @@ const Teleprompter = () => {
           className="flex-1 overflow-y-auto px-8 py-16"
         >
           <p className={`${getTextSizeClass()} ${getTextColorClass()} leading-relaxed tracking-wider text-center`}>
-
             {script}
           </p>
         </div>
-        
-        {/* Floating control panel */}
-        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 rounded-lg px-4 py-3 flex flex-wrap gap-4 items-center shadow-lg border border-gray-800 backdrop-blur-sm animate-fade-in">
-          <Button
-            onClick={toggleScrolling}
-            variant="outline"
-            size="sm"
-            className="bg-black/90 border-gray-700 text-white hover:bg-gray-800"
-          >
-            {isScrolling ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
-            {isScrolling ? "Pause" : "Play"}
-          </Button>
-          
-          <div className="flex items-center gap-2">
-            <AlignVerticalDistributeStart className="h-4 w-4 text-gray-400" />
-            <Slider
-              value={[scrollSpeed]}
-              min={1}
-              max={5}
-              step={1}
-              onValueChange={(value) => setScrollSpeed(value[0])}
-              className="w-28"
-            />
-          </div>
-          
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTextSize("small")}
-              className={`${textSize === "small" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 px-2`}
-            >
-              <Type className="h-5 w-5" />
-              <span className="ml-1">S</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTextSize("medium")}
-              className={`${textSize === "medium" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 px-2`}
-            >
-              <Type className="h-6 w-6" />
-              <span className="ml-1">M</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTextSize("large")}
-              className={`${textSize === "large" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 px-2`}
-            >
-              <Type className="h-7 w-7" />
-              <span className="ml-1">L</span>
-            </Button>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Palette className="h-4 w-4 text-gray-400" />
-            <div className="flex">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setTextColor("white")}
-                className={`rounded-r-none ${textColor === "white" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 p-1`}
-              >
-                <div className="h-4 w-4 bg-white rounded-full border border-gray-600"></div>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setTextColor("yellow")}
-                className={`rounded-none ${textColor === "yellow" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 p-1`}
-              >
-                <div className="h-4 w-4 bg-yellow-400 rounded-full"></div>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setTextColor("lightblue")}
-                className={`rounded-l-none ${textColor === "lightblue" ? 'bg-gray-700' : ''} text-white hover:bg-gray-700 p-1`}
-              >
-                <div className="h-4 w-4 bg-blue-300 rounded-full"></div>
-              </Button>
-            </div>
-          </div>
-          
-          <Button
-            onClick={exitPresentationMode}
-            variant="outline"
-            size="sm"
-            className="bg-black/90 border-gray-700 text-white hover:bg-gray-800"
-          >
-            <X className="h-4 w-4 mr-2" />
-            Exit
-          </Button>
-        </div>
+        {renderControlPanel()}
       </div>
     );
   }
