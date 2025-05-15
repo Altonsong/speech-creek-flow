@@ -8,7 +8,7 @@ interface ScrollControllerOptions {
 export function useScrollController(options: ScrollControllerOptions = {}) {
   const { 
     smoothness = 0.8,
-    minConfidence = 0.3
+    minConfidence = 0.05  // 降低最小置信度要求
   } = options;
 
   const targetScrollRef = useRef(0);
@@ -22,12 +22,17 @@ export function useScrollController(options: ScrollControllerOptions = {}) {
       currentScroll: element.scrollTop
     });
 
-    // Only make large jumps if confidence is high enough
+    // 降低跳转门槛，但保持一定限制
     if (confidence >= minConfidence) {
       targetScrollRef.current = position;
       console.log("✨ Updated target position:", position);
     } else {
-      console.log("⚠️ Low confidence, maintaining current target");
+      // 即使置信度低，也尝试小幅度调整
+      const currentPos = element.scrollTop;
+      const maxAdjustment = 100; // 最大调整幅度
+      const adjustment = (position - currentPos) * (confidence / minConfidence);
+      targetScrollRef.current = currentPos + Math.min(Math.abs(adjustment), maxAdjustment) * Math.sign(adjustment);
+      console.log("⚠️ Low confidence, making small adjustment");
     }
 
     if (!animationFrameRef.current) {
@@ -67,7 +72,7 @@ export function useScrollController(options: ScrollControllerOptions = {}) {
     
     // Update target scroll position based on speed
     if (element) {
-      const speedFactor = Math.pow(2, speed - 3); // Convert 1-5 scale to exponential factor
+      const speedFactor = Math.pow(1.8, speed - 3); // 调整速度曲线
       targetScrollRef.current = element.scrollTop + (speedFactor * 2);
       
       console.log("📈 New scroll target:", {
