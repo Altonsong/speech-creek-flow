@@ -23,6 +23,8 @@ import {
 import { Link } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
+import { useTextMatcher } from "@/hooks/use-text-matcher";
+import { useScrollController } from "@/hooks/use-scroll-controller";
 
 const Teleprompter = () => {
   const { toast } = useToast();
@@ -36,12 +38,34 @@ const Teleprompter = () => {
   
   const prompterRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const scrollIntervalRef = useRef<number | null>(null);
+
+  // Initialize text matcher and scroll controller
+  const { findMatchingParagraph, getParagraphPosition } = useTextMatcher(script);
+  const { scrollTo, updateScrollSpeed, stopScrolling } = useScrollController({
+    smoothness: 0.8,
+    minConfidence: 0.3
+  });
+
+  // Handle speech recognition results
+  const handleSpeechResult = (text: string) => {
+    if (!prompterRef.current || !text.trim()) return;
+
+    const { matchedParagraphIndex, confidence } = findMatchingParagraph(text);
+    const position = getParagraphPosition(matchedParagraphIndex);
+    
+    scrollTo(prompterRef.current, position, confidence);
+  };
+
+  // Handle speech rate changes
+  const handleSpeechRate = (rate: number) => {
+    if (!prompterRef.current) return;
+    setScrollSpeed(rate);
+    updateScrollSpeed(prompterRef.current, rate);
+  };
 
   const { isListening, error, startListening, stopListening } = useSpeechRecognition({
-    onSpeechRate: (rate) => {
-      setScrollSpeed(rate);
-    }
+    onResult: handleSpeechResult,
+    onSpeechRate: handleSpeechRate
   });
   
   // Toggle fullscreen
@@ -93,92 +117,22 @@ const Teleprompter = () => {
   // Enter presentation mode
   const enterPresentationMode = () => {
     setIsPresentationMode(true);
-    // Wait for component to render in presentation mode before starting scroll
+    // Start speech recognition automatically
     setTimeout(() => {
-      if (!isScrolling) {
-        toggleScrolling();
-      }
+      startListening();
     }, 100);
   };
   
   // Exit presentation mode
   const exitPresentationMode = () => {
     setIsPresentationMode(false);
-    if (isScrolling) {
-      toggleScrolling();
-    }
+    stopListening();
+    stopScrolling();
     // Reset scroll position
     if (prompterRef.current) {
       prompterRef.current.scrollTop = 0;
     }
   };
-  
-  // Start/stop scrolling
-  const toggleScrolling = () => {
-    if (isScrolling) {
-      if (scrollIntervalRef.current !== null) {
-        cancelAnimationFrame(scrollIntervalRef.current);
-        scrollIntervalRef.current = null;
-      }
-    } else {
-      // Using requestAnimationFrame for smoother scrolling
-      let lastTime = 0;
-      const scrollStep = () => {
-        const now = Date.now();
-        const speedMap = {
-          1: 80, // Slow - lower number means faster scroll
-          2: 50, // Normal slow
-          3: 30, // Normal
-          4: 20, // Normal fast
-          5: 15  // Fast - higher speed
-        };
-
-        // Only scroll if enough time has passed based on speed setting
-        if (now - lastTime > speedMap[scrollSpeed as keyof typeof speedMap]) {
-          lastTime = now;
-          
-          if (prompterRef.current) {
-            prompterRef.current.scrollTop += 1;
-            
-            // Auto-stop when reaching the end
-            if (
-              prompterRef.current.scrollHeight - prompterRef.current.scrollTop <=
-              prompterRef.current.clientHeight + 10
-            ) {
-              setIsScrolling(false);
-              // Reset scroll to top
-              prompterRef.current.scrollTop = 0;
-              return;
-            }
-          }
-        }
-        
-        scrollIntervalRef.current = requestAnimationFrame(scrollStep);
-      };
-      
-      scrollIntervalRef.current = requestAnimationFrame(scrollStep);
-    }
-    
-    setIsScrolling(!isScrolling);
-  };
-  
-  // Clean up animation frame on unmount
-  useEffect(() => {
-    return () => {
-      if (scrollIntervalRef.current !== null) {
-        cancelAnimationFrame(scrollIntervalRef.current);
-      }
-    };
-  }, []);
-
-  // Stop scrolling if speed changes while scrolling
-  useEffect(() => {
-    if (isScrolling) {
-      // Restart scrolling with new speed
-      toggleScrolling();
-      toggleScrolling();
-    }
-  }, [scrollSpeed]);
   
   // Get text size class
   const getTextSizeClass = () => {
@@ -209,16 +163,6 @@ const Teleprompter = () => {
 
   const renderControlPanel = () => (
     <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 rounded-lg px-4 py-3 flex flex-wrap gap-4 items-center shadow-lg border border-gray-800 backdrop-blur-sm animate-fade-in">
-      <Button
-        onClick={toggleScrolling}
-        variant="outline"
-        size="sm"
-        className="bg-black/90 border-gray-700 text-white hover:bg-gray-800"
-      >
-        {isScrolling ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
-        {isScrolling ? "Pause" : "Play"}
-      </Button>
-
       <Button
         onClick={isListening ? stopListening : startListening}
         variant="outline"
@@ -394,14 +338,20 @@ const Teleprompter = () => {
               Presentation Mode
             </Button>
             
-            {/* Original Scroll Controls */}
+            {/* Voice Control */}
             <Button
-              onClick={toggleScrolling}
+              onClick={isListening ? stopListening : startListening}
               variant="outline"
-              className={`${isFullscreen ? 'bg-black/90 border-gray-700 text-white' : ''}`}
+              className={`${isFullscreen ? 'bg-black/90 border-gray-700 text-white' : ''} ${
+                isListening ? 'bg-emerald-900/50' : ''
+              }`}
             >
-              {isScrolling ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
-              {isScrolling ? "Pause" : "Play"}
+              {isListening ? (
+                <Mic className="h-4 w-4 mr-2 text-emerald-500" />
+              ) : (
+                <MicOff className="h-4 w-4 mr-2" />
+              )}
+              {isListening ? "Stop Voice" : "Start Voice"}
             </Button>
             
             <div className="flex items-center gap-2">
