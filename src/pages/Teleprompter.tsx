@@ -30,9 +30,9 @@ const Teleprompter = () => {
   const { toast } = useToast();
   const [script, setScript] = useState("");
   const [isScrolling, setIsScrolling] = useState(false);
-  const [scrollSpeed, setScrollSpeed] = useState(2); // 1-5 scale
-  const [textSize, setTextSize] = useState("medium"); // "small", "medium", "large"
-  const [textColor, setTextColor] = useState("white"); // "white", "yellow", "lightblue"
+  const [scrollSpeed, setScrollSpeed] = useState(2);
+  const [textSize, setTextSize] = useState("medium");
+  const [textColor, setTextColor] = useState("white");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPresentationMode, setIsPresentationMode] = useState(false);
   
@@ -67,7 +67,7 @@ const Teleprompter = () => {
     onResult: handleSpeechResult,
     onSpeechRate: handleSpeechRate
   });
-  
+
   // Toggle fullscreen
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -100,7 +100,7 @@ const Teleprompter = () => {
       }
     }
   };
-  
+
   // Handle fullscreen change events
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -113,7 +113,7 @@ const Teleprompter = () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
   }, []);
-  
+
   // Enter presentation mode
   const enterPresentationMode = () => {
     setIsPresentationMode(true);
@@ -122,7 +122,7 @@ const Teleprompter = () => {
       startListening();
     }, 100);
   };
-  
+
   // Exit presentation mode
   const exitPresentationMode = () => {
     setIsPresentationMode(false);
@@ -133,7 +133,7 @@ const Teleprompter = () => {
       prompterRef.current.scrollTop = 0;
     }
   };
-  
+
   // Get text size class
   const getTextSizeClass = () => {
     switch (textSize) {
@@ -147,7 +147,7 @@ const Teleprompter = () => {
         return "text-3xl md:text-4xl";
     }
   };
-  
+
   // Get text color class
   const getTextColorClass = () => {
     switch (textColor) {
@@ -178,7 +178,7 @@ const Teleprompter = () => {
         )}
         {isListening ? "Stop Voice" : "Start Voice"}
       </Button>
-      
+
       <div className="flex items-center gap-2">
         <AlignVerticalDistributeStart className="h-4 w-4 text-gray-400" />
         <Slider
