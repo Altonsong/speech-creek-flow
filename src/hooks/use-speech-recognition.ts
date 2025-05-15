@@ -24,6 +24,8 @@ export function useSpeechRecognition({
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    console.log('Initializing speech recognition...');
+
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognitionInstance = new SpeechRecognition();
@@ -32,10 +34,13 @@ export function useSpeechRecognition({
       recognitionInstance.interimResults = true;
       recognitionInstance.lang = 'en-US';
 
+      console.log('Speech recognition initialized successfully');
       setRecognition(recognitionInstance);
       setError(null);
     } else {
-      setError('Speech recognition is not supported in this browser.');
+      const errorMsg = 'Speech recognition is not supported in this browser.';
+      console.error(errorMsg);
+      setError(errorMsg);
     }
   }, []);
 
@@ -47,6 +52,7 @@ export function useSpeechRecognition({
     
     // Convert WPM to 1-5 scale
     const normalizedRate = Math.max(1, Math.min(5, Math.round(wpm / 60)));
+    console.log(`Speech rate calculated: ${wpm} WPM, normalized to: ${normalizedRate}`);
     return normalizedRate;
   }, []);
 
@@ -58,17 +64,21 @@ export function useSpeechRecognition({
     let lastProcessedText = '';
 
     recognition.onstart = () => {
+      console.log('Speech recognition started');
       setIsListening(true);
       startTime = Date.now();
       lastProcessedText = '';
     };
 
     recognition.onend = () => {
+      console.log('Speech recognition ended');
       setIsListening(false);
     };
 
     recognition.onerror = (event) => {
-      setError(`Speech recognition error: ${event.error}`);
+      const errorMsg = `Speech recognition error: ${event.error}`;
+      console.error(errorMsg);
+      setError(errorMsg);
       setIsListening(false);
     };
 
@@ -77,8 +87,11 @@ export function useSpeechRecognition({
       const transcript = event.results[current][0].transcript;
       const confidence = event.results[current][0].confidence;
 
+      console.log(`Speech recognized: "${transcript}" (confidence: ${confidence})`);
+
       if (event.results[current].isFinal) {
         if (onResult) {
+          console.log('Calling onResult with transcript');
           onResult(transcript);
         }
 
@@ -86,6 +99,7 @@ export function useSpeechRecognition({
         if (onSpeechRate) {
           const duration = (Date.now() - startTime) / 1000;
           const rate = calculateSpeechRate(transcript, duration);
+          console.log(`Calling onSpeechRate with rate: ${rate}`);
           onSpeechRate(rate);
         }
 
@@ -95,20 +109,42 @@ export function useSpeechRecognition({
   }, [recognition, onResult, onSpeechRate, calculateSpeechRate]);
 
   const startListening = useCallback(() => {
-    if (recognition && !isListening) {
-      try {
+    console.log('Attempting to start speech recognition...');
+    console.log('Current state - recognition:', !!recognition, 'isListening:', isListening);
+
+    if (!recognition) {
+      const errorMsg = 'Speech recognition not initialized';
+      console.error(errorMsg);
+      setError(errorMsg);
+      return;
+    }
+
+    if (isListening) {
+      console.log('Already listening, stopping first...');
+      recognition.stop();
+    }
+
+    try {
+      // Small delay to ensure previous instance is fully stopped
+      setTimeout(() => {
         recognition.start();
         setError(null);
-      } catch (err) {
-        setError('Error starting speech recognition');
-        console.error('Speech recognition error:', err);
-      }
+        console.log('Speech recognition started successfully');
+      }, 100);
+    } catch (err) {
+      const errorMsg = `Error starting speech recognition: ${err}`;
+      console.error(errorMsg);
+      setError(errorMsg);
     }
   }, [recognition, isListening]);
 
   const stopListening = useCallback(() => {
+    console.log('Attempting to stop speech recognition...');
     if (recognition && isListening) {
       recognition.stop();
+      console.log('Speech recognition stopped');
+    } else {
+      console.log('No active speech recognition to stop');
     }
   }, [recognition, isListening]);
 
