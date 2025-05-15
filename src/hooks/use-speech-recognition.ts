@@ -1,17 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
 
 interface UseSpeechRecognitionProps {
+  onResult?: (text: string) => void;
   onSpeechRate?: (rate: number) => void;
   language?: string;
 }
 
 export function useSpeechRecognition({ 
+  onResult,
   onSpeechRate,
   language = 'en-US' 
 }: UseSpeechRecognitionProps) {
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
   const [error, setError] = useState<string>('');
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const [finalTranscript, setFinalTranscript] = useState('');
 
   // Calculate speech rate based on the length of text and time
   const calculateSpeechRate = useCallback((text: string, duration: number) => {
@@ -49,24 +53,42 @@ export function useSpeechRecognition({
     recognitionInstance.lang = language;
 
     let startTime = Date.now();
-    let lastText = '';
+    let lastProcessedLength = 0;
 
     recognitionInstance.onstart = () => {
       setIsListening(true);
       startTime = Date.now();
+      setInterimTranscript('');
+      setFinalTranscript('');
     };
 
     recognitionInstance.onresult = (event) => {
-      const transcript = Array.from(event.results)
-        .map(result => result[0].transcript)
-        .join('');
+      let interim = '';
+      let final = '';
 
-      if (event.results[event.results.length - 1].isFinal) {
-        const duration = (Date.now() - startTime) / 1000; // Convert to seconds
-        const rate = calculateSpeechRate(transcript.slice(lastText.length), duration);
-        lastText = transcript;
-        onSpeechRate?.(rate);
+      for (let i = 0; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          final += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
       }
+
+      setInterimTranscript(interim);
+      setFinalTranscript(final);
+
+      // Calculate rate for new content
+      const newContent = final.slice(lastProcessedLength);
+      if (newContent.length > 0) {
+        const duration = (Date.now() - startTime) / 1000;
+        const rate = calculateSpeechRate(newContent, duration);
+        onSpeechRate?.(rate);
+        lastProcessedLength = final.length;
+      }
+
+      // Send combined transcript to parent component
+      const fullTranscript = `${final} ${interim}`.trim();
+      onResult?.(fullTranscript);
     };
 
     recognitionInstance.onerror = (event) => {
@@ -86,7 +108,7 @@ export function useSpeechRecognition({
     return () => {
       recognitionInstance.stop();
     };
-  }, [language, onSpeechRate, calculateSpeechRate]);
+  }, [language, onResult, onSpeechRate, calculateSpeechRate]);
 
   const startListening = useCallback(() => {
     if (recognition && !isListening) {
@@ -105,6 +127,7 @@ export function useSpeechRecognition({
   return {
     isListening,
     error,
+    transcript: `${finalTranscript} ${interimTranscript}`.trim(),
     startListening,
     stopListening
   };
