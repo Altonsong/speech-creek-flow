@@ -68,6 +68,13 @@ const Teleprompter = () => {
     onSpeechRate: handleSpeechRate
   });
 
+  // Auto-start speech recognition when entering presentation mode
+  useEffect(() => {
+    if (isPresentationMode && !isListening) {
+      startListening();
+    }
+  }, [isPresentationMode, isListening, startListening]);
+
   // Toggle fullscreen
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -117,10 +124,6 @@ const Teleprompter = () => {
   // Enter presentation mode
   const enterPresentationMode = () => {
     setIsPresentationMode(true);
-    // Start speech recognition automatically
-    setTimeout(() => {
-      startListening();
-    }, 100);
   };
 
   // Exit presentation mode
@@ -290,7 +293,7 @@ const Teleprompter = () => {
               <ArrowLeft className="h-5 w-5 mr-2" /> Back
             </Link>
             <h1 className="text-xl font-bold">SpeechCreek</h1>
-            <div className="w-20"></div> {/* Spacer for centering */}
+            <div className="w-20"></div>
           </div>
         </header>
       )}
@@ -327,7 +330,6 @@ const Teleprompter = () => {
 
         {(!isFullscreen || document.fullscreenElement) && (
           <div className={`mt-4 flex flex-wrap gap-4 items-center ${isFullscreen ? 'p-4 bg-black/70 rounded-t-lg' : ''}`}>
-            {/* Presentation Mode Button */}
             <Button
               onClick={enterPresentationMode}
               variant="default"
@@ -338,7 +340,6 @@ const Teleprompter = () => {
               Presentation Mode
             </Button>
             
-            {/* Voice Control */}
             <Button
               onClick={isListening ? stopListening : startListening}
               variant="outline"
