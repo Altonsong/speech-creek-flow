@@ -6,12 +6,12 @@ interface TextMatchResult {
 }
 
 export function useTextMatcher(script: string) {
-  // Split script into paragraphs and memoize to avoid unnecessary recalculations
+  // 将脚本分割成段落并缓存
   const paragraphs = useMemo(() => {
     return script.split('\n').filter(p => p.trim().length > 0);
   }, [script]);
 
-  // Find the best matching paragraph for the spoken text
+  // 找到最匹配的段落
   const findMatchingParagraph = (spokenText: string): TextMatchResult => {
     if (!spokenText || paragraphs.length === 0) {
       return { matchedParagraphIndex: 0, confidence: 0 };
@@ -20,20 +20,20 @@ export function useTextMatcher(script: string) {
     let bestMatchIndex = 0;
     let highestConfidence = 0;
 
-    // Convert spoken text to lowercase and split into significant words
+    // 将语音文本转换为小写并分割成重要单词
     const normalizedSpokenText = spokenText.toLowerCase();
     const spokenWords = normalizedSpokenText.split(' ')
-      .filter(word => word.length > 3) // Only consider words longer than 3 characters
-      .filter(word => !['this', 'that', 'then', 'than', 'they', 'there'].includes(word)); // Exclude common words
+      .filter(word => word.length > 2) // 降低词长度要求
+      .filter(word => !['this', 'that', 'then', 'than', 'they', 'there', 'with', 'have', 'and', 'the'].includes(word));
 
-    // Compare spoken text against each paragraph
+    // 将语音文本与每个段落进行比较
     paragraphs.forEach((paragraph, index) => {
       const normalizedParagraph = paragraph.toLowerCase();
       const paragraphWords = normalizedParagraph.split(' ')
-        .filter(word => word.length > 3)
-        .filter(word => !['this', 'that', 'then', 'than', 'they', 'there'].includes(word));
+        .filter(word => word.length > 2)
+        .filter(word => !['this', 'that', 'then', 'than', 'they', 'there', 'with', 'have', 'and', 'the'].includes(word));
       
-      // Calculate matching words and their positions
+      // 计算匹配的单词数量和它们的位置
       let matchingWords = 0;
       let sequentialMatches = 0;
       let lastMatchIndex = -1;
@@ -49,7 +49,7 @@ export function useTextMatcher(script: string) {
         }
       });
       
-      // Calculate confidence score (0-1) with bonus for sequential matches
+      // 计算置信度分数 (0-1)，并为连续匹配加分
       const matchRatio = matchingWords / Math.max(spokenWords.length, paragraphWords.length);
       const sequentialBonus = sequentialMatches / matchingWords;
       const confidence = matchRatio * (1 + sequentialBonus) / 2;
@@ -66,20 +66,20 @@ export function useTextMatcher(script: string) {
     };
   };
 
-  // Calculate the scroll position for a given paragraph
+  // 计算段落的滚动位置
   const getParagraphPosition = (paragraphIndex: number): number => {
     if (paragraphIndex < 0 || paragraphIndex >= paragraphs.length) {
       return 0;
     }
 
-    // Calculate approximate position based on character count
+    // 根据字符数计算大致位置
     const charactersBeforeParagraph = paragraphs
       .slice(0, paragraphIndex)
-      .reduce((sum, p) => sum + p.length + 1, 0); // +1 for newline
+      .reduce((sum, p) => sum + p.length + 1, 0); // +1 表示换行符
 
-    // Estimate scroll position (assuming average character height)
-    const averageCharacterHeight = 30; // Approximate pixels per line
-    return charactersBeforeParagraph * (averageCharacterHeight / 50); // Adjust for reasonable scrolling
+    // 估算滚动位置 (假设平均字符高度)
+    const averageCharacterHeight = 30; // 每行大约的像素高度
+    return charactersBeforeParagraph * (averageCharacterHeight / 50); // 调整以获得合理的滚动
   };
 
   return {

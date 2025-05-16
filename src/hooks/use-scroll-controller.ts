@@ -9,7 +9,7 @@ export function useScrollController({ smoothness = 0.8, minConfidence = 0.3 }: S
   let animationFrameId: number;
 
   const scrollTo = (element: HTMLElement, targetPosition: number, confidence: number) => {
-    // Always scroll if confidence is high enough
+    // 如果置信度太低就不滚动
     if (confidence < minConfidence) {
       console.log('Skipping scroll due to low confidence:', confidence);
       return;
@@ -17,12 +17,19 @@ export function useScrollController({ smoothness = 0.8, minConfidence = 0.3 }: S
     
     const startPosition = element.scrollTop;
     const distance = targetPosition - startPosition;
+    
+    // 如果距离太小也不滚动
+    if (Math.abs(distance) < 50) {
+      return;
+    }
+
     let startTime: number | null = null;
     
     const animate = (currentTime: number) => {
       if (!startTime) startTime = currentTime;
-      const progress = (currentTime - startTime) / 1000; // Convert to seconds
+      const progress = (currentTime - startTime) / 1000; // 转换为秒
       
+      // 使用 easeInOutCubic 缓动函数使滚动更自然
       const easeInOutCubic = (t: number) => {
         return t < 0.5
           ? 4 * t * t * t
@@ -39,6 +46,7 @@ export function useScrollController({ smoothness = 0.8, minConfidence = 0.3 }: S
       }
     };
     
+    // 取消之前的动画
     cancelAnimationFrame(animationFrameId);
     animationFrameId = requestAnimationFrame(animate);
   };
@@ -51,7 +59,7 @@ export function useScrollController({ smoothness = 0.8, minConfidence = 0.3 }: S
 
     currentSpeed = speed;
     if (isScrolling) {
-      // Adjust scrolling based on new speed
+      // 根据新速度调整滚动
       const targetPosition = element.scrollTop + (speed * 100);
       scrollTo(element, targetPosition, 1);
     }
