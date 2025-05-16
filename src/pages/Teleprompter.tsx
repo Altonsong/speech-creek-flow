@@ -26,6 +26,11 @@ import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useTextMatcher } from "@/hooks/use-text-matcher";
 import { useScrollController } from "@/hooks/use-scroll-controller";
 
+const MENU_HEIGHT = 80; // Control panel height
+const SCROLL_TRIGGER_TOP = 0.2; // Trigger scroll when text is in top 20%
+const SCROLL_TRIGGER_BOTTOM = 0.6; // Trigger scroll when text is in bottom 60%
+const SCROLL_TARGET_POSITION = 0.35; // Position text at 35% from top after scroll
+
 const Teleprompter = () => {
   const { toast } = useToast();
   const [script, setScript] = useState("");
@@ -39,23 +44,49 @@ const Teleprompter = () => {
   const prompterRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Helper function to find element containing text
+  // Helper function to find element containing text with improved matching
   const findElementContainingText = (text: string, container: HTMLElement): HTMLElement | null => {
     const elements = container.getElementsByTagName('p');
-    // Split the recognized text into words and use them for matching
-    const searchWords = text.toLowerCase().split(' ').filter(word => word.length > 3);
+    const searchWords = text.toLowerCase()
+      .split(' ')
+      .filter(word => word.length > 3)
+      .filter(word => !['this', 'that', 'then', 'than', 'they', 'there', 'with', 'have'].includes(word));
     
+    let bestMatch = {
+      element: null as HTMLElement | null,
+      score: 0
+    };
+
     for (const element of Array.from(elements)) {
       const elementText = element.textContent?.toLowerCase() || '';
-      // Check if any of the search words appear in the element text
-      if (searchWords.some(word => elementText.includes(word))) {
-        console.log('Found matching element for words:', searchWords);
-        console.log('Element text:', elementText);
-        return element;
+      let matchCount = 0;
+      let sequentialMatches = 0;
+      let lastMatchIndex = -1;
+
+      searchWords.forEach(word => {
+        const index = elementText.indexOf(word);
+        if (index !== -1) {
+          matchCount++;
+          if (index > lastMatchIndex) {
+            sequentialMatches++;
+          }
+          lastMatchIndex = index;
+        }
+      });
+
+      // Calculate match score considering both quantity and sequence of matches
+      const matchScore = (matchCount / searchWords.length) * 0.6 + 
+                        (sequentialMatches / matchCount) * 0.4;
+
+      if (matchScore > bestMatch.score) {
+        bestMatch = {
+          element: element as HTMLElement,
+          score: matchScore
+        };
       }
     }
-    console.log('No matching element found for words:', searchWords);
-    return null;
+
+    return bestMatch.score > 0.3 ? bestMatch.element : null;
   };
 
   // Initialize text matcher and scroll controller
@@ -65,57 +96,58 @@ const Teleprompter = () => {
     minConfidence: 0.3
   });
 
-  // Handle speech recognition results
+  // Handle speech recognition results with improved scroll logic
   const handleSpeechResult = (text: string) => {
     if (!prompterRef.current || !text.trim()) return;
 
     const container = prompterRef.current;
     const containerHeight = container.clientHeight;
     const scrollTop = container.scrollTop;
-    const menuHeight = 80; // Approximate height of the bottom menu
 
     // Try to find the element containing the recognized text
     const element = findElementContainingText(text, container);
     
     if (element) {
       const elementTop = element.offsetTop;
-      console.log('Element position:', {
-        elementTop,
-        scrollTop,
-        containerHeight,
-        threshold: scrollTop + containerHeight * 0.65 - menuHeight
-      });
+      const elementBottom = elementTop + element.offsetHeight;
+      
+      // Calculate visibility thresholds
+      const topThreshold = scrollTop + containerHeight * SCROLL_TRIGGER_TOP;
+      const bottomThreshold = scrollTop + containerHeight * SCROLL_TRIGGER_BOTTOM - MENU_HEIGHT;
 
-      // Trigger scroll if element is outside the desired viewing area or near the bottom menu
-      if (elementTop < scrollTop || 
-          elementTop > scrollTop + containerHeight * 0.65 - menuHeight) {
-        const targetPosition = elementTop - containerHeight * 0.35;
-        console.log('Scrolling to position:', targetPosition);
+      // Trigger scroll if element is outside the optimal viewing area
+      if (elementTop < topThreshold || elementBottom > bottomThreshold) {
+        const targetPosition = Math.max(0, 
+          elementTop - containerHeight * SCROLL_TARGET_POSITION
+        );
         scrollTo(container, targetPosition, 1);
       }
     } else {
-      // Fallback to paragraph matching
-      console.log('Using fallback paragraph matching');
+      // Fallback to paragraph matching with improved positioning
       const { matchedParagraphIndex, confidence } = findMatchingParagraph(text);
       const position = getParagraphPosition(matchedParagraphIndex);
-      // Ensure the target position considers the bottom menu
-      const targetPosition = Math.max(0, position - containerHeight * 0.35);
+      const targetPosition = Math.max(0, 
+        position - containerHeight * SCROLL_TARGET_POSITION
+      );
       scrollTo(container, targetPosition, confidence);
     }
   };
 
-  // Handle speech rate changes
+  // Handle speech rate changes with validation
   const handleSpeechRate = (rate: number) => {
     if (!prompterRef.current || isNaN(rate)) {
       console.log('Invalid speech rate:', rate);
       return;
     }
     
-    // Ensure rate is within valid range
+    // Ensure rate is within valid range and apply smoothing
+    const currentRate = scrollSpeed;
     const validRate = Math.max(1, Math.min(5, rate));
-    console.log('Updating scroll speed to:', validRate);
-    setScrollSpeed(validRate);
-    updateScrollSpeed(prompterRef.current, validRate);
+    const smoothedRate = currentRate * 0.7 + validRate * 0.3; // Apply smoothing
+    
+    console.log('Updating scroll speed to:', smoothedRate);
+    setScrollSpeed(smoothedRate);
+    updateScrollSpeed(prompterRef.current, smoothedRate);
   };
 
   // Initialize speech recognition
@@ -236,7 +268,7 @@ const Teleprompter = () => {
           value={[scrollSpeed]}
           min={1}
           max={5}
-          step={1}
+          step={0.1}
           onValueChange={(value) => setScrollSpeed(value[0])}
           className="w-28"
         />
@@ -320,7 +352,7 @@ const Teleprompter = () => {
       <div className="fixed inset-0 bg-black flex flex-col" ref={containerRef}>
         <div 
           ref={prompterRef}
-          className="flex-1 overflow-y-auto px-8 py-16"
+          className="flex-1 overflow-y-auto px-8 py-16 pb-32"
         >
           <p className={`${getTextSizeClass()} ${getTextColorClass()} leading-relaxed tracking-wider text-center`}>
             {script}
@@ -409,7 +441,7 @@ const Teleprompter = () => {
                 value={[scrollSpeed]}
                 min={1}
                 max={5}
-                step={1}
+                step={0.1}
                 onValueChange={(value) => setScrollSpeed(value[0])}
                 className="w-28"
               />
