@@ -91,3 +91,5 @@ const handleSpeechResult = (text: string) => {
 };
 
 // 其他代码保持不变...
+
+export default handleSpeechResult
