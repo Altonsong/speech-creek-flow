@@ -9,17 +9,16 @@ export function useScrollController({ smoothness = 0.8, minConfidence = 0.3 }: S
   let animationFrameId: number;
 
   const scrollTo = (element: HTMLElement, targetPosition: number, confidence: number) => {
-    // 如果置信度太低就不滚动
-    if (confidence < minConfidence) {
-      console.log('Skipping scroll due to low confidence:', confidence);
+    // 降低置信度要求，提高滚动触发率
+    if (confidence < 0.2) {
       return;
     }
     
     const startPosition = element.scrollTop;
     const distance = targetPosition - startPosition;
     
-    // 如果距离太小也不滚动
-    if (Math.abs(distance) < 50) {
+    // 只在有意义的滚动距离时触发
+    if (Math.abs(distance) < 30) {
       return;
     }
 
@@ -27,16 +26,14 @@ export function useScrollController({ smoothness = 0.8, minConfidence = 0.3 }: S
     
     const animate = (currentTime: number) => {
       if (!startTime) startTime = currentTime;
-      const progress = (currentTime - startTime) / 1000; // 转换为秒
+      const progress = (currentTime - startTime) / 1000;
       
-      // 使用 easeInOutCubic 缓动函数使滚动更自然
-      const easeInOutCubic = (t: number) => {
-        return t < 0.5
-          ? 4 * t * t * t
-          : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      // 使用更平滑的缓动函数
+      const easeInOutQuad = (t: number) => {
+        return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
       };
       
-      const easedProgress = easeInOutCubic(Math.min(progress / smoothness, 1));
+      const easedProgress = easeInOutQuad(Math.min(progress / smoothness, 1));
       const newPosition = startPosition + distance * easedProgress;
       
       element.scrollTop = newPosition;
@@ -46,20 +43,15 @@ export function useScrollController({ smoothness = 0.8, minConfidence = 0.3 }: S
       }
     };
     
-    // 取消之前的动画
     cancelAnimationFrame(animationFrameId);
     animationFrameId = requestAnimationFrame(animate);
   };
 
   const updateScrollSpeed = (element: HTMLElement, speed: number) => {
-    if (isNaN(speed) || speed < 1 || speed > 5) {
-      console.log('Invalid scroll speed:', speed);
-      return;
-    }
+    if (isNaN(speed) || speed < 1 || speed > 5) return;
 
     currentSpeed = speed;
     if (isScrolling) {
-      // 根据新速度调整滚动
       const targetPosition = element.scrollTop + (speed * 100);
       scrollTo(element, targetPosition, 1);
     }
