@@ -9,7 +9,11 @@ export function useScrollController({ smoothness = 0.8, minConfidence = 0.3 }: S
   let animationFrameId: number;
 
   const scrollTo = (element: HTMLElement, targetPosition: number, confidence: number) => {
-    if (confidence < minConfidence) return;
+    // Always scroll if confidence is high enough
+    if (confidence < minConfidence) {
+      console.log('Skipping scroll due to low confidence:', confidence);
+      return;
+    }
     
     const startPosition = element.scrollTop;
     const distance = targetPosition - startPosition;
@@ -40,6 +44,11 @@ export function useScrollController({ smoothness = 0.8, minConfidence = 0.3 }: S
   };
 
   const updateScrollSpeed = (element: HTMLElement, speed: number) => {
+    if (isNaN(speed) || speed < 1 || speed > 5) {
+      console.log('Invalid scroll speed:', speed);
+      return;
+    }
+
     currentSpeed = speed;
     if (isScrolling) {
       // Adjust scrolling based on new speed

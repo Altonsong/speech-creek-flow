@@ -19,6 +19,8 @@ export function useSpeechRecognition({
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
+  const [lastProcessTime, setLastProcessTime] = useState<number>(0);
+  const [wordCount, setWordCount] = useState<number>(0);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -46,12 +48,24 @@ export function useSpeechRecognition({
 
   // Calculate speech rate based on word count and time
   const calculateSpeechRate = useCallback((text: string, duration: number) => {
+    if (!text.trim() || duration <= 0) {
+      return 2; // Default rate if invalid input
+    }
+
     const words = text.trim().split(/\s+/).length;
     const minutes = duration / 60;
     const wpm = words / minutes;
     
     // Convert WPM to 1-5 scale
-    const normalizedRate = Math.max(1, Math.min(5, Math.round(wpm / 60)));
+    // Typical speaking rates: slow ~100 WPM, normal ~150 WPM, fast ~200 WPM
+    // Map these to our 1-5 scale
+    let normalizedRate = 1;
+    if (wpm <= 100) normalizedRate = 1;
+    else if (wpm <= 150) normalizedRate = 2;
+    else if (wpm <= 200) normalizedRate = 3;
+    else if (wpm <= 250) normalizedRate = 4;
+    else normalizedRate = 5;
+
     console.log(`Speech rate calculated: ${wpm} WPM, normalized to: ${normalizedRate}`);
     return normalizedRate;
   }, []);
@@ -60,14 +74,11 @@ export function useSpeechRecognition({
   useEffect(() => {
     if (!recognition) return;
 
-    let startTime: number;
-    let lastProcessedText = '';
-
     recognition.onstart = () => {
       console.log('Speech recognition started');
       setIsListening(true);
-      startTime = Date.now();
-      lastProcessedText = '';
+      setLastProcessTime(Date.now());
+      setWordCount(0);
     };
 
     recognition.onend = () => {
@@ -97,16 +108,21 @@ export function useSpeechRecognition({
 
         // Calculate and report speech rate
         if (onSpeechRate) {
-          const duration = (Date.now() - startTime) / 1000;
+          const currentTime = Date.now();
+          const duration = (currentTime - lastProcessTime) / 1000;
           const rate = calculateSpeechRate(transcript, duration);
-          console.log(`Calling onSpeechRate with rate: ${rate}`);
-          onSpeechRate(rate);
+          
+          if (!isNaN(rate)) {
+            console.log(`Calling onSpeechRate with rate: ${rate}`);
+            onSpeechRate(rate);
+          }
+          
+          setLastProcessTime(currentTime);
+          setWordCount(wordCount + transcript.trim().split(/\s+/).length);
         }
-
-        lastProcessedText = transcript;
       }
     };
-  }, [recognition, onResult, onSpeechRate, calculateSpeechRate]);
+  }, [recognition, onResult, onSpeechRate, calculateSpeechRate, lastProcessTime, wordCount]);
 
   const startListening = useCallback(() => {
     console.log('Attempting to start speech recognition...');

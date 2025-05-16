@@ -20,22 +20,39 @@ export function useTextMatcher(script: string) {
     let bestMatchIndex = 0;
     let highestConfidence = 0;
 
-    // Convert spoken text to lowercase for case-insensitive matching
+    // Convert spoken text to lowercase and split into significant words
     const normalizedSpokenText = spokenText.toLowerCase();
-    const spokenWords = normalizedSpokenText.split(' ');
+    const spokenWords = normalizedSpokenText.split(' ')
+      .filter(word => word.length > 3) // Only consider words longer than 3 characters
+      .filter(word => !['this', 'that', 'then', 'than', 'they', 'there'].includes(word)); // Exclude common words
 
     // Compare spoken text against each paragraph
     paragraphs.forEach((paragraph, index) => {
       const normalizedParagraph = paragraph.toLowerCase();
-      const paragraphWords = normalizedParagraph.split(' ');
+      const paragraphWords = normalizedParagraph.split(' ')
+        .filter(word => word.length > 3)
+        .filter(word => !['this', 'that', 'then', 'than', 'they', 'there'].includes(word));
       
-      // Calculate matching words
-      const matchingWords = spokenWords.filter(word => 
-        paragraphWords.includes(word)
-      ).length;
+      // Calculate matching words and their positions
+      let matchingWords = 0;
+      let sequentialMatches = 0;
+      let lastMatchIndex = -1;
+
+      spokenWords.forEach(word => {
+        const wordIndex = paragraphWords.indexOf(word);
+        if (wordIndex !== -1) {
+          matchingWords++;
+          if (wordIndex > lastMatchIndex) {
+            sequentialMatches++;
+          }
+          lastMatchIndex = wordIndex;
+        }
+      });
       
-      // Calculate confidence score (0-1)
-      const confidence = matchingWords / Math.max(spokenWords.length, paragraphWords.length);
+      // Calculate confidence score (0-1) with bonus for sequential matches
+      const matchRatio = matchingWords / Math.max(spokenWords.length, paragraphWords.length);
+      const sequentialBonus = sequentialMatches / matchingWords;
+      const confidence = matchRatio * (1 + sequentialBonus) / 2;
       
       if (confidence > highestConfidence) {
         highestConfidence = confidence;
