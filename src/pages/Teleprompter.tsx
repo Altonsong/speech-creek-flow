@@ -118,13 +118,19 @@ const Teleprompter = () => {
     updateScrollSpeed(prompterRef.current, validRate);
   };
 
+  // Initialize speech recognition
+  const { isListening, error, startListening, stopListening } = useSpeechRecognition({
+    onResult: handleSpeechResult,
+    onSpeechRate: handleSpeechRate
+  });
+
   // Auto start speech recognition when entering presentation mode
   useEffect(() => {
-    if (isPresentationMode) {
+    if (isPresentationMode && !isListening) {
       console.log('Starting speech recognition in presentation mode');
       startListening();
     }
-  }, [isPresentationMode]);
+  }, [isPresentationMode, isListening, startListening]);
 
   // Enter presentation mode
   const enterPresentationMode = () => {
