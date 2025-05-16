@@ -46,6 +46,13 @@ const Teleprompter = () => {
     minConfidence: 0.3
   });
 
+  // Auto start speech recognition when entering presentation mode
+  useEffect(() => {
+    if (isPresentationMode) {
+      startListening();
+    }
+  }, [isPresentationMode]);
+
   // Handle speech recognition results
   const handleSpeechResult = (text: string) => {
     if (!prompterRef.current || !text.trim()) return;
@@ -53,7 +60,12 @@ const Teleprompter = () => {
     const { matchedParagraphIndex, confidence } = findMatchingParagraph(text);
     const position = getParagraphPosition(matchedParagraphIndex);
     
-    scrollTo(prompterRef.current, position, confidence);
+    // Calculate the target scroll position to keep text in 1/3 to 1/2 of screen
+    const containerHeight = prompterRef.current.clientHeight;
+    const oneThirdHeight = containerHeight / 3;
+    const targetPosition = Math.max(0, position - oneThirdHeight);
+    
+    scrollTo(prompterRef.current, targetPosition, confidence);
   };
 
   // Handle speech rate changes
@@ -68,43 +80,44 @@ const Teleprompter = () => {
     onSpeechRate: handleSpeechRate
   });
 
-  // Auto-start speech recognition when entering presentation mode
-  useEffect(() => {
-    if (isPresentationMode && !isListening) {
-      startListening();
+  // Enter presentation mode
+  const enterPresentationMode = () => {
+    setIsPresentationMode(true);
+    // Speech recognition will auto-start due to useEffect
+  };
+
+  // Exit presentation mode
+  const exitPresentationMode = () => {
+    setIsPresentationMode(false);
+    stopListening();
+    stopScrolling();
+    if (prompterRef.current) {
+      prompterRef.current.scrollTop = 0;
     }
-  }, [isPresentationMode, isListening, startListening]);
+  };
 
   // Toggle fullscreen
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      if (containerRef.current?.requestFullscreen) {
-        containerRef.current.requestFullscreen()
-          .then(() => {
-            setIsFullscreen(true);
-          })
-          .catch((err) => {
-            toast({
-              title: "Fullscreen Error",
-              description: `Error attempting to enable fullscreen: ${err.message}`,
-              variant: "destructive",
-            });
+      containerRef.current?.requestFullscreen()
+        .then(() => setIsFullscreen(true))
+        .catch((err) => {
+          toast({
+            title: "Fullscreen Error",
+            description: `Error attempting to enable fullscreen: ${err.message}`,
+            variant: "destructive",
           });
-      }
+        });
     } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen()
-          .then(() => {
-            setIsFullscreen(false);
-          })
-          .catch((err) => {
-            toast({
-              title: "Fullscreen Error",
-              description: `Error attempting to exit fullscreen: ${err.message}`,
-              variant: "destructive",
-            });
+      document.exitFullscreen()
+        .then(() => setIsFullscreen(false))
+        .catch((err) => {
+          toast({
+            title: "Fullscreen Error", 
+            description: `Error attempting to exit fullscreen: ${err.message}`,
+            variant: "destructive",
           });
-      }
+        });
     }
   };
 
@@ -120,22 +133,6 @@ const Teleprompter = () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
   }, []);
-
-  // Enter presentation mode
-  const enterPresentationMode = () => {
-    setIsPresentationMode(true);
-  };
-
-  // Exit presentation mode
-  const exitPresentationMode = () => {
-    setIsPresentationMode(false);
-    stopListening();
-    stopScrolling();
-    // Reset scroll position
-    if (prompterRef.current) {
-      prompterRef.current.scrollTop = 0;
-    }
-  };
 
   // Get text size class
   const getTextSizeClass = () => {
