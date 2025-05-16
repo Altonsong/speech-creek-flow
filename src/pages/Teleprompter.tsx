@@ -26,11 +26,10 @@ import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useTextMatcher } from "@/hooks/use-text-matcher";
 import { useScrollController } from "@/hooks/use-scroll-controller";
 
-// 更新常量值
-const MENU_HEIGHT = 80; // Control panel height
-const SCROLL_TRIGGER_TOP = 0.1; // Trigger scroll when text is in top 10%
-const SCROLL_TRIGGER_BOTTOM = 0.7; // Trigger scroll when text is in bottom 70%
-const SCROLL_TARGET_POSITION = 0.3; // Position text at 30% from top after scroll
+// Constants for scroll and highlight control
+const MENU_HEIGHT = 80;
+const SCROLL_TRIGGER_THRESHOLD = 0.33; // Start scrolling at 1/3 of the screen
+const IDEAL_TEXT_POSITION = 0.4; // Keep text between 1/3 and 1/2 of screen
 
 const Teleprompter = () => {
   const { toast } = useToast();
@@ -41,65 +40,64 @@ const Teleprompter = () => {
   const [textColor, setTextColor] = useState("white");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPresentationMode, setIsPresentationMode] = useState(false);
+  const [currentParagraphIndex, setCurrentParagraphIndex] = useState(-1);
   
   const prompterRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const paragraphsRef = useRef<HTMLParagraphElement[]>([]);
 
-  // 优化文本匹配函数
+  // Split script into paragraphs
+  const paragraphs = script.split('\n').filter(p => p.trim().length > 0);
+
   const findElementContainingText = (text: string, container: HTMLElement): HTMLElement | null => {
-    const elements = container.getElementsByTagName('p');
+    if (!paragraphsRef.current.length) return null;
+
     const searchWords = text.toLowerCase()
       .split(' ')
-      .filter(word => word.length > 2) // 降低词长度要求
-      .filter(word => !['this', 'that', 'then', 'than', 'they', 'there', 'with', 'have', 'and', 'the'].includes(word));
+      .filter(word => word.length > 2)
+      .filter(word => !['the', 'and', 'was', 'were', 'that', 'this', 'they'].includes(word));
     
     let bestMatch = {
       element: null as HTMLElement | null,
-      score: 0
+      score: 0,
+      index: -1
     };
 
-    for (const element of Array.from(elements)) {
+    paragraphsRef.current.forEach((element, index) => {
       const elementText = element.textContent?.toLowerCase() || '';
       let matchCount = 0;
-      let sequentialMatches = 0;
-      let lastMatchIndex = -1;
-
-      // 使用更宽松的匹配规则
+      
       searchWords.forEach(word => {
         if (elementText.includes(word)) {
           matchCount++;
-          const index = elementText.indexOf(word);
-          if (index > lastMatchIndex) {
-            sequentialMatches++;
-          }
-          lastMatchIndex = index;
         }
       });
 
-      // 调整匹配分数计算
-      const matchScore = (matchCount / Math.max(searchWords.length, 1)) * 0.7 + 
-                        (sequentialMatches / Math.max(matchCount, 1)) * 0.3;
-
-      if (matchScore > bestMatch.score) {
+      const score = matchCount / Math.max(searchWords.length, 1);
+      
+      if (score > bestMatch.score) {
         bestMatch = {
-          element: element as HTMLElement,
-          score: matchScore
+          element,
+          score,
+          index
         };
       }
-    }
+    });
 
-    // 降低匹配阈值
-    return bestMatch.score > 0.2 ? bestMatch.element : null;
+    if (bestMatch.score > 0.3) {
+      setCurrentParagraphIndex(bestMatch.index);
+      return bestMatch.element;
+    }
+    
+    return null;
   };
 
-  // Initialize text matcher and scroll controller
   const { findMatchingParagraph, getParagraphPosition } = useTextMatcher(script);
   const { scrollTo, updateScrollSpeed, stopScrolling } = useScrollController({
     smoothness: 0.8,
     minConfidence: 0.3
   });
 
-  // 优化滚动处理函数
   const handleSpeechResult = (text: string) => {
     if (!prompterRef.current || !text.trim()) return;
 
@@ -107,64 +105,58 @@ const Teleprompter = () => {
     const containerHeight = container.clientHeight;
     const scrollTop = container.scrollTop;
 
-    // 尝试找到匹配的元素
     const element = findElementContainingText(text, container);
     
     if (element) {
       const elementTop = element.offsetTop;
       const elementBottom = elementTop + element.offsetHeight;
       
-      // 计算可视区域的阈值
-      const topThreshold = scrollTop + containerHeight * SCROLL_TRIGGER_TOP;
-      const bottomThreshold = scrollTop + containerHeight * SCROLL_TRIGGER_BOTTOM - MENU_HEIGHT;
-
-      // 如果元素不在理想的可视区域内，触发滚动
-      if (elementTop < topThreshold || elementBottom > bottomThreshold) {
-        const targetPosition = Math.max(0, 
-          elementTop - containerHeight * SCROLL_TARGET_POSITION
-        );
-        
-        // 使用更高的置信度来确保滚动
+      // Check if element is below the trigger threshold
+      if (elementTop > scrollTop + containerHeight * SCROLL_TRIGGER_THRESHOLD) {
+        const targetPosition = elementTop - containerHeight * IDEAL_TEXT_POSITION;
         scrollTo(container, targetPosition, 0.9);
       }
-    } else {
-      // 使用段落匹配作为备选方案
-      const { matchedParagraphIndex, confidence } = findMatchingParagraph(text);
-      const position = getParagraphPosition(matchedParagraphIndex);
-      const targetPosition = Math.max(0, 
-        position - containerHeight * SCROLL_TARGET_POSITION
-      );
-      scrollTo(container, targetPosition, Math.max(confidence, 0.5)); // 提高最小置信度
+      
+      // Highlight current and next paragraphs
+      paragraphsRef.current.forEach((p, index) => {
+        if (index === currentParagraphIndex) {
+          p.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+        } else if (index === currentParagraphIndex + 1) {
+          p.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+        } else {
+          p.style.backgroundColor = 'transparent';
+        }
+      });
     }
   };
 
-  // Handle speech rate changes
   const handleSpeechRate = (rate: number) => {
-    if (!prompterRef.current || isNaN(rate)) {
-      console.log('Invalid speech rate:', rate);
-      return;
-    }
-    
-    // Ensure rate is within valid range
+    if (!prompterRef.current || isNaN(rate)) return;
     const validRate = Math.max(1, Math.min(5, rate));
-    console.log('Updating scroll speed to:', validRate);
     setScrollSpeed(validRate);
     updateScrollSpeed(prompterRef.current, validRate);
   };
 
-  // Initialize speech recognition
   const { isListening, error, startListening, stopListening } = useSpeechRecognition({
     onResult: handleSpeechResult,
     onSpeechRate: handleSpeechRate
   });
 
-  // Auto start speech recognition when entering presentation mode
+  // Auto start speech recognition in presentation mode
   useEffect(() => {
-    if (isPresentationMode && !isListening) {
-      console.log('Starting speech recognition in presentation mode');
+    if (isPresentationMode) {
       startListening();
     }
-  }, [isPresentationMode, isListening, startListening]);
+  }, [isPresentationMode]);
+
+  // Store paragraph refs
+  useEffect(() => {
+    if (prompterRef.current) {
+      paragraphsRef.current = Array.from(
+        prompterRef.current.getElementsByTagName('p')
+      );
+    }
+  }, [script, isPresentationMode]);
 
   // Enter presentation mode
   const enterPresentationMode = () => {
@@ -348,7 +340,22 @@ const Teleprompter = () => {
     </div>
   );
 
-  // If in presentation mode, render presentation view
+  const renderParagraphs = () => {
+    return paragraphs.map((paragraph, index) => (
+      <p
+        key={index}
+        className={`${getTextSizeClass()} transition-colors duration-300`}
+        style={{
+          padding: '0.5rem',
+          marginBottom: '1rem',
+          borderRadius: '0.25rem'
+        }}
+      >
+        {paragraph}
+      </p>
+    ));
+  };
+
   if (isPresentationMode) {
     return (
       <div className="fixed inset-0 bg-black flex flex-col" ref={containerRef}>
@@ -356,16 +363,15 @@ const Teleprompter = () => {
           ref={prompterRef}
           className="flex-1 overflow-y-auto px-8 py-16"
         >
-          <p className={`${getTextSizeClass()} ${getTextColorClass()} leading-relaxed tracking-wider text-center`}>
-            {script}
-          </p>
+          <div className={`${getTextColorClass()} leading-relaxed tracking-wider text-center`}>
+            {renderParagraphs()}
+          </div>
         </div>
         {renderControlPanel()}
       </div>
     );
   }
-  
-  // Regular editor view
+
   return (
     <div className="min-h-screen bg-white flex flex-col" ref={containerRef}>
       {!isFullscreen && (
@@ -396,12 +402,11 @@ const Teleprompter = () => {
           <div 
             ref={prompterRef}
             className={`h-full overflow-y-auto p-8 ${getTextColorClass()} leading-relaxed`}
-            style={{
-              whiteSpace: "pre-wrap"
-            }}
           >
             {script ? (
-              <p className={`${getTextSizeClass()}`}>{script}</p>
+              <div className="text-center">
+                {renderParagraphs()}
+              </div>
             ) : (
               <div className="h-full flex items-center justify-center text-gray-400">
                 <p>Your speech will appear here</p>
