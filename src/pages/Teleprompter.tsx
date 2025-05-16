@@ -42,13 +42,19 @@ const Teleprompter = () => {
   // Helper function to find element containing text
   const findElementContainingText = (text: string, container: HTMLElement): HTMLElement | null => {
     const elements = container.getElementsByTagName('p');
+    // Split the recognized text into words and use them for matching
+    const searchWords = text.toLowerCase().split(' ').filter(word => word.length > 3);
+    
     for (const element of Array.from(elements)) {
-      if (element.textContent?.toLowerCase().includes(text.toLowerCase())) {
-        console.log('Found matching element:', element.textContent);
+      const elementText = element.textContent?.toLowerCase() || '';
+      // Check if any of the search words appear in the element text
+      if (searchWords.some(word => elementText.includes(word))) {
+        console.log('Found matching element for words:', searchWords);
+        console.log('Element text:', elementText);
         return element;
       }
     }
-    console.log('No matching element found for text:', text);
+    console.log('No matching element found for words:', searchWords);
     return null;
   };
 
@@ -66,6 +72,7 @@ const Teleprompter = () => {
     const container = prompterRef.current;
     const containerHeight = container.clientHeight;
     const scrollTop = container.scrollTop;
+    const menuHeight = 80; // Approximate height of the bottom menu
 
     // Try to find the element containing the recognized text
     const element = findElementContainingText(text, container);
@@ -76,12 +83,13 @@ const Teleprompter = () => {
         elementTop,
         scrollTop,
         containerHeight,
-        threshold: scrollTop + containerHeight * 0.4
+        threshold: scrollTop + containerHeight * 0.65 - menuHeight
       });
 
-      // Trigger scroll if element is outside the desired viewing area
-      if (elementTop < scrollTop || elementTop > scrollTop + containerHeight * 0.4) {
-        const targetPosition = elementTop - containerHeight * 0.3;
+      // Trigger scroll if element is outside the desired viewing area or near the bottom menu
+      if (elementTop < scrollTop || 
+          elementTop > scrollTop + containerHeight * 0.65 - menuHeight) {
+        const targetPosition = elementTop - containerHeight * 0.35;
         console.log('Scrolling to position:', targetPosition);
         scrollTo(container, targetPosition, 1);
       }
@@ -90,7 +98,8 @@ const Teleprompter = () => {
       console.log('Using fallback paragraph matching');
       const { matchedParagraphIndex, confidence } = findMatchingParagraph(text);
       const position = getParagraphPosition(matchedParagraphIndex);
-      const targetPosition = Math.max(0, position - containerHeight * 0.3);
+      // Ensure the target position considers the bottom menu
+      const targetPosition = Math.max(0, position - containerHeight * 0.35);
       scrollTo(container, targetPosition, confidence);
     }
   };
@@ -101,15 +110,13 @@ const Teleprompter = () => {
       console.log('Invalid speech rate:', rate);
       return;
     }
-    console.log('Updating scroll speed to:', rate);
-    setScrollSpeed(rate);
-    updateScrollSpeed(prompterRef.current, rate);
+    
+    // Ensure rate is within valid range
+    const validRate = Math.max(1, Math.min(5, rate));
+    console.log('Updating scroll speed to:', validRate);
+    setScrollSpeed(validRate);
+    updateScrollSpeed(prompterRef.current, validRate);
   };
-
-  const { isListening, error, startListening, stopListening } = useSpeechRecognition({
-    onResult: handleSpeechResult,
-    onSpeechRate: handleSpeechRate
-  });
 
   // Auto start speech recognition when entering presentation mode
   useEffect(() => {
