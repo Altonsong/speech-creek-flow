@@ -39,6 +39,19 @@ const Teleprompter = () => {
   const prompterRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Helper function to find element containing text
+  const findElementContainingText = (text: string, container: HTMLElement): HTMLElement | null => {
+    const elements = container.getElementsByTagName('p');
+    for (const element of Array.from(elements)) {
+      if (element.textContent?.toLowerCase().includes(text.toLowerCase())) {
+        console.log('Found matching element:', element.textContent);
+        return element;
+      }
+    }
+    console.log('No matching element found for text:', text);
+    return null;
+  };
+
   // Initialize text matcher and scroll controller
   const { findMatchingParagraph, getParagraphPosition } = useTextMatcher(script);
   const { scrollTo, updateScrollSpeed, stopScrolling } = useScrollController({
@@ -46,31 +59,49 @@ const Teleprompter = () => {
     minConfidence: 0.3
   });
 
-  // Auto start speech recognition when entering presentation mode
-  useEffect(() => {
-    if (isPresentationMode) {
-      startListening();
-    }
-  }, [isPresentationMode]);
-
   // Handle speech recognition results
   const handleSpeechResult = (text: string) => {
     if (!prompterRef.current || !text.trim()) return;
 
-    const { matchedParagraphIndex, confidence } = findMatchingParagraph(text);
-    const position = getParagraphPosition(matchedParagraphIndex);
+    const container = prompterRef.current;
+    const containerHeight = container.clientHeight;
+    const scrollTop = container.scrollTop;
+
+    // Try to find the element containing the recognized text
+    const element = findElementContainingText(text, container);
     
-    // Calculate the target scroll position to keep text in 1/3 to 1/2 of screen
-    const containerHeight = prompterRef.current.clientHeight;
-    const oneThirdHeight = containerHeight / 3;
-    const targetPosition = Math.max(0, position - oneThirdHeight);
-    
-    scrollTo(prompterRef.current, targetPosition, confidence);
+    if (element) {
+      const elementTop = element.offsetTop;
+      console.log('Element position:', {
+        elementTop,
+        scrollTop,
+        containerHeight,
+        threshold: scrollTop + containerHeight * 0.4
+      });
+
+      // Trigger scroll if element is outside the desired viewing area
+      if (elementTop < scrollTop || elementTop > scrollTop + containerHeight * 0.4) {
+        const targetPosition = elementTop - containerHeight * 0.3;
+        console.log('Scrolling to position:', targetPosition);
+        scrollTo(container, targetPosition, 1);
+      }
+    } else {
+      // Fallback to paragraph matching
+      console.log('Using fallback paragraph matching');
+      const { matchedParagraphIndex, confidence } = findMatchingParagraph(text);
+      const position = getParagraphPosition(matchedParagraphIndex);
+      const targetPosition = Math.max(0, position - containerHeight * 0.3);
+      scrollTo(container, targetPosition, confidence);
+    }
   };
 
   // Handle speech rate changes
   const handleSpeechRate = (rate: number) => {
-    if (!prompterRef.current) return;
+    if (!prompterRef.current || isNaN(rate)) {
+      console.log('Invalid speech rate:', rate);
+      return;
+    }
+    console.log('Updating scroll speed to:', rate);
     setScrollSpeed(rate);
     updateScrollSpeed(prompterRef.current, rate);
   };
@@ -80,10 +111,17 @@ const Teleprompter = () => {
     onSpeechRate: handleSpeechRate
   });
 
+  // Auto start speech recognition when entering presentation mode
+  useEffect(() => {
+    if (isPresentationMode) {
+      console.log('Starting speech recognition in presentation mode');
+      startListening();
+    }
+  }, [isPresentationMode]);
+
   // Enter presentation mode
   const enterPresentationMode = () => {
     setIsPresentationMode(true);
-    // Speech recognition will auto-start due to useEffect
   };
 
   // Exit presentation mode
@@ -113,7 +151,7 @@ const Teleprompter = () => {
         .then(() => setIsFullscreen(false))
         .catch((err) => {
           toast({
-            title: "Fullscreen Error", 
+            title: "Fullscreen Error",
             description: `Error attempting to exit fullscreen: ${err.message}`,
             variant: "destructive",
           });
