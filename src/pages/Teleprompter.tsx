@@ -26,55 +26,64 @@ import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useTextMatcher } from "@/hooks/use-text-matcher";
 import { useScrollController } from "@/hooks/use-scroll-controller";
 
-// Constants for scroll and highlight control
-const MENU_HEIGHT = 80;
-const SCROLL_TRIGGER_THRESHOLD = 0.33; // Start scrolling at 1/3 of the screen
-const IDEAL_TEXT_POSITION = 0.4; // Keep text between 1/3 and 1/2 of screen
+// 定义滚动和高亮控制的常量
+const MENU_HEIGHT = 80; // 菜单高度
+const SCROLL_TRIGGER_THRESHOLD = 0.33; // 开始滚动的阈值（屏幕1/3处）
+const IDEAL_TEXT_POSITION = 0.4; // 理想文本位置（屏幕1/3到1/2之间）
 
 const Teleprompter = () => {
-  const { toast } = useToast();
-  const [script, setScript] = useState("");
-  const [isScrolling, setIsScrolling] = useState(false);
-  const [scrollSpeed, setScrollSpeed] = useState(2);
-  const [textSize, setTextSize] = useState("medium");
-  const [textColor, setTextColor] = useState("white");
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isPresentationMode, setIsPresentationMode] = useState(false);
-  const [currentParagraphIndex, setCurrentParagraphIndex] = useState(-1);
+  // 状态管理
+  const { toast } = useToast(); // 提示消息钩子
+  const [script, setScript] = useState(""); // 脚本内容
+  const [isScrolling, setIsScrolling] = useState(false); // 是否正在滚动
+  const [scrollSpeed, setScrollSpeed] = useState(2); // 滚动速度（1-5）
+  const [textSize, setTextSize] = useState("medium"); // 文本大小
+  const [textColor, setTextColor] = useState("white"); // 文本颜色
+  const [isFullscreen, setIsFullscreen] = useState(false); // 是否全屏
+  const [isPresentationMode, setIsPresentationMode] = useState(false); // 是否演示模式
+  const [currentParagraphIndex, setCurrentParagraphIndex] = useState(-1); // 当前段落索引
   
-  const prompterRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const paragraphsRef = useRef<HTMLParagraphElement[]>([]);
+  // DOM引用
+  const prompterRef = useRef<HTMLDivElement>(null); // 提词器容器引用
+  const containerRef = useRef<HTMLDivElement>(null); // 主容器引用
+  const paragraphsRef = useRef<HTMLParagraphElement[]>([]); // 段落元素引用数组
 
-  // Split script into paragraphs
+  // 将脚本分割成段落
   const paragraphs = script.split('\n').filter(p => p.trim().length > 0);
 
+  // 在容器中查找包含特定文本的元素
   const findElementContainingText = (text: string, container: HTMLElement): HTMLElement | null => {
     if (!paragraphsRef.current.length) return null;
 
+    // 过滤并处理搜索词
     const searchWords = text.toLowerCase()
       .split(' ')
       .filter(word => word.length > 2)
       .filter(word => !['the', 'and', 'was', 'were', 'that', 'this', 'they'].includes(word));
     
+    // 存储最佳匹配结果
     let bestMatch = {
       element: null as HTMLElement | null,
       score: 0,
       index: -1
     };
 
+    // 遍历所有段落寻找最佳匹配
     paragraphsRef.current.forEach((element, index) => {
       const elementText = element.textContent?.toLowerCase() || '';
       let matchCount = 0;
       
+      // 计算匹配词数
       searchWords.forEach(word => {
         if (elementText.includes(word)) {
           matchCount++;
         }
       });
 
+      // 计算匹配分数
       const score = matchCount / Math.max(searchWords.length, 1);
       
+      // 更新最佳匹配
       if (score > bestMatch.score) {
         bestMatch = {
           element,
@@ -84,6 +93,7 @@ const Teleprompter = () => {
       }
     });
 
+    // 如果匹配分数超过阈值，返回匹配元素
     if (bestMatch.score > 0.3) {
       setCurrentParagraphIndex(bestMatch.index);
       return bestMatch.element;
@@ -92,12 +102,14 @@ const Teleprompter = () => {
     return null;
   };
 
+  // 使用文本匹配和滚动控制钩子
   const { findMatchingParagraph, getParagraphPosition } = useTextMatcher(script);
   const { scrollTo, updateScrollSpeed, stopScrolling } = useScrollController({
-    smoothness: 0.8,
-    minConfidence: 0.3
+    smoothness: 0.8, // 滚动平滑度
+    minConfidence: 0.3 // 最小置信度
   });
 
+  // 处理语音识别结果
   const handleSpeechResult = (text: string) => {
     if (!prompterRef.current || !text.trim()) return;
 
@@ -105,19 +117,20 @@ const Teleprompter = () => {
     const containerHeight = container.clientHeight;
     const scrollTop = container.scrollTop;
 
+    // 查找匹配的元素
     const element = findElementContainingText(text, container);
     
     if (element) {
       const elementTop = element.offsetTop;
       const elementBottom = elementTop + element.offsetHeight;
       
-      // Check if element is below the trigger threshold
+      // 检查元素是否超过触发阈值
       if (elementTop > scrollTop + containerHeight * SCROLL_TRIGGER_THRESHOLD) {
         const targetPosition = elementTop - containerHeight * IDEAL_TEXT_POSITION;
         scrollTo(container, targetPosition, 0.9);
       }
       
-      // Highlight current and next paragraphs
+      // 高亮当前和下一段落
       paragraphsRef.current.forEach((p, index) => {
         if (index === currentParagraphIndex) {
           p.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
@@ -130,6 +143,7 @@ const Teleprompter = () => {
     }
   };
 
+  // 处理语音速率变化
   const handleSpeechRate = (rate: number) => {
     if (!prompterRef.current || isNaN(rate)) return;
     const validRate = Math.max(1, Math.min(5, rate));
@@ -137,19 +151,20 @@ const Teleprompter = () => {
     updateScrollSpeed(prompterRef.current, validRate);
   };
 
+  // 使用语音识别钩子
   const { isListening, error, startListening, stopListening } = useSpeechRecognition({
     onResult: handleSpeechResult,
     onSpeechRate: handleSpeechRate
   });
 
-  // Auto start speech recognition in presentation mode
+  // 在演示模式下自动启动语音识别
   useEffect(() => {
     if (isPresentationMode) {
       startListening();
     }
   }, [isPresentationMode]);
 
-  // Store paragraph refs
+  // 存储段落引用
   useEffect(() => {
     if (prompterRef.current) {
       paragraphsRef.current = Array.from(
@@ -158,12 +173,12 @@ const Teleprompter = () => {
     }
   }, [script, isPresentationMode]);
 
-  // Enter presentation mode
+  // 进入演示模式
   const enterPresentationMode = () => {
     setIsPresentationMode(true);
   };
 
-  // Exit presentation mode
+  // 退出演示模式
   const exitPresentationMode = () => {
     setIsPresentationMode(false);
     stopListening();
@@ -173,9 +188,10 @@ const Teleprompter = () => {
     }
   };
 
-  // Toggle fullscreen
+  // 切换全屏模式
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
+      // 进入全屏
       containerRef.current?.requestFullscreen()
         .then(() => setIsFullscreen(true))
         .catch((err) => {
@@ -186,6 +202,7 @@ const Teleprompter = () => {
           });
         });
     } else {
+      // 退出全屏
       document.exitFullscreen()
         .then(() => setIsFullscreen(false))
         .catch((err) => {
@@ -198,7 +215,7 @@ const Teleprompter = () => {
     }
   };
 
-  // Handle fullscreen change events
+  // 监听全屏变化事件
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -211,7 +228,7 @@ const Teleprompter = () => {
     };
   }, []);
 
-  // Get text size class
+  // 获取文本大小类名
   const getTextSizeClass = () => {
     switch (textSize) {
       case "small":
@@ -225,7 +242,7 @@ const Teleprompter = () => {
     }
   };
 
-  // Get text color class
+  // 获取文本颜色类名
   const getTextColorClass = () => {
     switch (textColor) {
       case "yellow":
@@ -238,8 +255,10 @@ const Teleprompter = () => {
     }
   };
 
+  // 渲染控制面板
   const renderControlPanel = () => (
     <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 rounded-lg px-4 py-3 flex flex-wrap gap-4 items-center shadow-lg border border-gray-800 backdrop-blur-sm animate-fade-in">
+      {/* 语音控制按钮 */}
       <Button
         onClick={isListening ? stopListening : startListening}
         variant="outline"
@@ -256,6 +275,7 @@ const Teleprompter = () => {
         {isListening ? "Stop Voice" : "Start Voice"}
       </Button>
 
+      {/* 滚动速度控制 */}
       <div className="flex items-center gap-2">
         <AlignVerticalDistributeStart className="h-4 w-4 text-gray-400" />
         <Slider
@@ -268,6 +288,7 @@ const Teleprompter = () => {
         />
       </div>
       
+      {/* 文本大小控制 */}
       <div className="flex items-center gap-1">
         <Button
           variant="ghost"
@@ -298,6 +319,7 @@ const Teleprompter = () => {
         </Button>
       </div>
       
+      {/* 文本颜色控制 */}
       <div className="flex items-center gap-2">
         <Palette className="h-4 w-4 text-gray-400" />
         <div className="flex">
@@ -328,6 +350,7 @@ const Teleprompter = () => {
         </div>
       </div>
       
+      {/* 退出按钮 */}
       <Button
         onClick={exitPresentationMode}
         variant="outline"
@@ -340,6 +363,7 @@ const Teleprompter = () => {
     </div>
   );
 
+  // 渲染段落
   const renderParagraphs = () => {
     return paragraphs.map((paragraph, index) => (
       <p
@@ -356,6 +380,7 @@ const Teleprompter = () => {
     ));
   };
 
+  // 演示模式UI
   if (isPresentationMode) {
     return (
       <div className="fixed inset-0 bg-black flex flex-col" ref={containerRef}>
@@ -372,8 +397,10 @@ const Teleprompter = () => {
     );
   }
 
+  // 编辑模式UI
   return (
     <div className="min-h-screen bg-white flex flex-col" ref={containerRef}>
+      {/* 顶部导航栏（非全屏模式） */}
       {!isFullscreen && (
         <header className="bg-white border-b border-gray-200">
           <div className="container mx-auto py-4 px-4 flex items-center justify-between">
@@ -386,7 +413,9 @@ const Teleprompter = () => {
         </header>
       )}
 
+      {/* 主要内容区域 */}
       <main className={`flex-1 flex flex-col ${isFullscreen ? 'bg-black' : 'container mx-auto py-6 px-4'}`}>
+        {/* 文本编辑区域（非全屏模式） */}
         {!isFullscreen && (
           <div className="mb-6">
             <Textarea
@@ -398,6 +427,7 @@ const Teleprompter = () => {
           </div>
         )}
 
+        {/* 预览区域 */}
         <div className={`${isFullscreen ? 'flex-1' : 'border border-gray-200 rounded-lg bg-black'}`}>
           <div 
             ref={prompterRef}
@@ -415,8 +445,10 @@ const Teleprompter = () => {
           </div>
         </div>
 
+        {/* 控制栏 */}
         {(!isFullscreen || document.fullscreenElement) && (
           <div className={`mt-4 flex flex-wrap gap-4 items-center ${isFullscreen ? 'p-4 bg-black/70 rounded-t-lg' : ''}`}>
+            {/* 演示模式按钮 */}
             <Button
               onClick={enterPresentationMode}
               variant="default"
@@ -427,6 +459,7 @@ const Teleprompter = () => {
               Presentation Mode
             </Button>
             
+            {/* 语音控制按钮 */}
             <Button
               onClick={isListening ? stopListening : startListening}
               variant="outline"
@@ -442,6 +475,7 @@ const Teleprompter = () => {
               {isListening ? "Stop Voice" : "Start Voice"}
             </Button>
             
+            {/* 滚动速度控制 */}
             <div className="flex items-center gap-2">
               <AlignVerticalDistributeStart className={`h-4 w-4 ${isFullscreen ? 'text-white' : ''}`} />
               <Slider
@@ -454,6 +488,7 @@ const Teleprompter = () => {
               />
             </div>
             
+            {/* 文本大小控制 */}
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
@@ -484,6 +519,7 @@ const Teleprompter = () => {
               </Button>
             </div>
             
+            {/* 文本颜色控制 */}
             <div className="flex items-center gap-2">
               <Palette className={`h-4 w-4 ${isFullscreen ? 'text-white' : ''}`} />
               <div className="flex">
@@ -514,6 +550,7 @@ const Teleprompter = () => {
               </div>
             </div>
             
+            {/* 全屏控制按钮 */}
             <div className="ml-auto">
               <Button
                 onClick={toggleFullscreen}
@@ -528,6 +565,7 @@ const Teleprompter = () => {
         )}
       </main>
 
+      {/* 页脚（非全屏模式） */}
       {!isFullscreen && (
         <footer className="border-t border-gray-200 py-4 px-4 text-center text-sm text-gray-500">
           &copy; {new Date().getFullYear()} SpeechCreek. All rights reserved.
