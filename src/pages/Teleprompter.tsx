@@ -28,8 +28,8 @@ import { useScrollController } from "@/hooks/use-scroll-controller";
 
 // 定义滚动和高亮控制的常量
 const MENU_HEIGHT = 80; // 菜单高度
-const SCROLL_TRIGGER_THRESHOLD = 0.33; // 开始滚动的阈值（屏幕1/3处）
-const IDEAL_TEXT_POSITION = 0.4; // 理想文本位置（屏幕1/3到1/2之间）
+const SCROLL_TRIGGER_THRESHOLD = 0.2; // 开始滚动的阈值（屏幕1/3处）
+const IDEAL_TEXT_POSITION = 0.3; // 理想文本位置（屏幕1/3到1/2之间）
 
 const Teleprompter = () => {
   // 状态管理
