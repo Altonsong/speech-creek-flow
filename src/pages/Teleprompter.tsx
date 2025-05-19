@@ -133,11 +133,17 @@ const Teleprompter = () => {
       // 高亮当前和下一段落
       paragraphsRef.current.forEach((p, index) => {
         if (index === currentParagraphIndex) {
+          // 当前段落：更明显的高亮 + 粗体
           p.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+          p.style.fontWeight = 'bold';
         } else if (index === currentParagraphIndex + 1) {
+          // 下一段落：轻微高亮 + 正常字体
           p.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+          p.style.fontWeight = 'normal';
         } else {
+          // 其他段落：无背景 + 正常字体
           p.style.backgroundColor = 'transparent';
+          p.style.fontWeight = 'normal';
         }
       });
     }
