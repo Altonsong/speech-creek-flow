@@ -133,9 +133,9 @@ const Teleprompter = () => {
       // 高亮当前和下一段落
       paragraphsRef.current.forEach((p, index) => {
         if (index === currentParagraphIndex) {
-          p.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+          p.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
         } else if (index === currentParagraphIndex + 1) {
-          p.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+          p.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
         } else {
           p.style.backgroundColor = 'transparent';
         }
