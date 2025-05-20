@@ -10,7 +10,7 @@ const Index = () => {
       <header className="container mx-auto py-6 px-4">
         <div className="flex items-center">
           <Mic className="h-6 w-6 text-teleprompter-accent mr-2" />
-          <h1 className="text-2xl font-bold">SpeechCreek 1.07</h1>
+          <h1 className="text-2xl font-bold">SpeechCreek 1.08</h1>
         </div>
       </header>
 
